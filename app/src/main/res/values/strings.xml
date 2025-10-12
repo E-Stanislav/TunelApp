@@ -22,6 +22,7 @@
     <string name="server_address">Адрес</string>
     <string name="server_port">Порт</string>
     <string name="no_servers">Нет серверов. Импортируйте VLESS URL.</string>
+    <string name="no_server_selected">Выберите сервер из списка ниже</string>
     
     <!-- VPN -->
     <string name="vpn_permission_required">Требуется разрешение VPN</string>
@@ -37,5 +38,9 @@
     <string name="settings">Настройки</string>
     <string name="about">О приложении</string>
     <string name="version">Версия %s</string>
+    
+    <!-- Common -->
+    <string name="ok">OK</string>
+    <string name="warning">Подсказка</string>
 </resources>
 

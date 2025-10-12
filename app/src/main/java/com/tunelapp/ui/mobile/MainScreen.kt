@@ -42,6 +42,10 @@ fun MainScreen(viewModel: MainViewModel) {
     val servers by viewModel.servers.collectAsState()
     val importResult by viewModel.importResult.collectAsState()
     
+    // Dialog state
+    var showErrorDialog by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
+    
     // VPN permission launcher
     val vpnPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -70,6 +74,15 @@ fun MainScreen(viewModel: MainViewModel) {
                 // Success handled by ViewModel
             }
             viewModel.clearImportResult()
+        }
+    }
+    
+    // Show error dialog when error message changes
+    LaunchedEffect(vpnState.errorMessage) {
+        vpnState.errorMessage?.let { error ->
+            errorMessage = error
+            showErrorDialog = true
+            viewModel.clearError()
         }
     }
     
@@ -128,18 +141,37 @@ fun MainScreen(viewModel: MainViewModel) {
         }
     }
     
-    // Error snackbar
-    vpnState.errorMessage?.let { error ->
-        Snackbar(
-            modifier = Modifier.padding(16.dp),
-            action = {
-                TextButton(onClick = { viewModel.clearError() }) {
-                    Text("OK")
+    // Error dialog
+    if (showErrorDialog) {
+        AlertDialog(
+            onDismissRequest = { showErrorDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = {
+                Text(
+                    text = stringResource(R.string.warning),
+                    style = MaterialTheme.typography.titleMedium
+                )
+            },
+            text = {
+                Text(
+                    text = errorMessage,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { showErrorDialog = false }
+                ) {
+                    Text(stringResource(R.string.ok))
                 }
             }
-        ) {
-            Text(error)
-        }
+        )
     }
 }
 
@@ -203,6 +235,19 @@ fun ConnectionCard(
                         modifier = Modifier.size(48.dp),
                         tint = MaterialTheme.colorScheme.onPrimary
                     )
+                    
+                    // Show warning icon when no server is selected
+                    if (vpnState.connectionState == ConnectionState.DISCONNECTED && vpnState.server == null) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = "No server selected",
+                            modifier = Modifier
+                                .size(20.dp)
+                                .align(Alignment.TopEnd)
+                                .offset(x = 8.dp, y = (-8).dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
             

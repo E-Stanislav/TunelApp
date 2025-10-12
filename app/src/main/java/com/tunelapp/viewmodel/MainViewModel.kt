@@ -210,7 +210,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _currentServer.value?.let { server ->
                     connect(context, server)
                 } ?: run {
-                    _errorMessage.value = "No server selected"
+                    _errorMessage.value = context.getString(com.tunelapp.R.string.no_server_selected)
                 }
             }
             ConnectionState.CONNECTED -> {
