@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TunelApp</string>
+    
+    <!-- Main Screen -->
+    <string name="connect">Подключить</string>
+    <string name="disconnect">Отключить</string>
+    <string name="connecting">Подключение…</string>
+    <string name="disconnecting">Отключение…</string>
+    <string name="connected">Подключено</string>
+    <string name="disconnected">Отключено</string>
+    
+    <!-- Import -->
+    <string name="import_from_clipboard">Импортировать из буфера</string>
+    <string name="import_success">Сервер успешно импортирован</string>
+    <string name="import_error">Ошибка импорта: %s</string>
+    <string name="clipboard_empty">Буфер обмена пуст</string>
+    <string name="invalid_vless_url">Неверный формат VLESS URL</string>
+    
+    <!-- Server Info -->
+    <string name="server_name">Имя сервера</string>
+    <string name="server_address">Адрес</string>
+    <string name="server_port">Порт</string>
+    <string name="no_servers">Нет серверов. Импортируйте VLESS URL.</string>
+    
+    <!-- VPN -->
+    <string name="vpn_permission_required">Требуется разрешение VPN</string>
+    <string name="vpn_permission_denied">Разрешение VPN отклонено</string>
+    <string name="vpn_service_running">VPN активен</string>
+    
+    <!-- Stats -->
+    <string name="upload_speed">Отправка: %s/s</string>
+    <string name="download_speed">Загрузка: %s/s</string>
+    <string name="total_traffic">Всего: %s</string>
+    
+    <!-- Settings -->
+    <string name="settings">Настройки</string>
+    <string name="about">О приложении</string>
+    <string name="version">Версия %s</string>
+</resources>
+
