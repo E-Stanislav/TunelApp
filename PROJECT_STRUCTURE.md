@@ -297,3 +297,5 @@ ls -lh app/build/outputs/apk/mobile/debug/*.apk
 Версия: 1.0.0  
 Статус: ✅ Готово к разработке (требуется Xray интеграция)
 
+
+
