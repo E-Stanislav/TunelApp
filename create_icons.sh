@@ -9,3 +9,4 @@ echo "Created minimal PNG files"
 
 
 
+

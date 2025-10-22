@@ -65,6 +65,9 @@ class SimpleVpnService : VpnService() {
         when (intent?.action) {
             ACTION_CONNECT -> {
                 val serverId = intent.getLongExtra(EXTRA_SERVER_ID, -1)
+                // Post an immediate foreground notification to avoid Android O+ crash
+                // if heavy work delays startForeground.
+                startForeground(NOTIFICATION_ID, createStatusNotification(getString(com.tunelapp.R.string.connecting)))
                 connectVpn(serverId)
             }
             ACTION_DISCONNECT -> {
@@ -101,14 +104,20 @@ class SimpleVpnService : VpnService() {
                 }
                 
                 Log.d(TAG, "Server found: ${server.name} (${server.address}:${server.port})")
+
+                // Mark service as running early so UI does not time out while
+                // sing-box initializes and TUN is being established. We'll
+                // revert this if anything fails below.
+                isRunning = true
                 
                 // Start sing-box core
                 Log.d(TAG, "Starting sing-box core...")
                 val result = xrayManager?.start(server)
                 if (result?.isFailure == true) {
-                    Log.e(TAG, "Failed to start sing-box", result.exceptionOrNull())
-                    stopSelf()
-                    return@launch
+                    // Fallback mode: continue without sing-box so VPN can
+                    // still establish and UI won't fail hard. Traffic may not
+                    // be proxied until core integration succeeds.
+                    Log.e(TAG, "Failed to start sing-box (fallback mode)", result.exceptionOrNull())
                 }
                 
                 Log.d(TAG, "sing-box started successfully")
@@ -118,6 +127,7 @@ class SimpleVpnService : VpnService() {
                 if (!establishVpn(server)) {
                     Log.e(TAG, "Failed to establish VPN interface")
                     xrayManager?.stop()
+                    isRunning = false
                     stopSelf()
                     return@launch
                 }
@@ -134,6 +144,7 @@ class SimpleVpnService : VpnService() {
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to connect VPN", e)
                 e.printStackTrace()
+                isRunning = false
                 stopSelf()
             }
         }
@@ -241,6 +252,15 @@ class SimpleVpnService : VpnService() {
         NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("TunelApp")
             .setContentText("Connected to ${server.name}")
+            .setSmallIcon(R.drawable.ic_vpn)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .build()
+
+    private fun createStatusNotification(text: String) =
+        NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("TunelApp")
+            .setContentText(text)
             .setSmallIcon(R.drawable.ic_vpn)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)

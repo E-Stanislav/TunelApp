@@ -227,20 +227,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 
                 Log.d(TAG, "Starting foreground service...")
                 context.startForegroundService(serviceIntent)
-                
-                // Wait a bit for service to start
-                Log.d(TAG, "Waiting for service to start...")
-                kotlinx.coroutines.delay(2000)
-                
+
+                // Actively wait for the service to finish bringing up the TUN
+                // interface and mark itself as running. This can take several
+                // seconds on some devices/networks. We'll poll up to ~15s.
+                Log.d(TAG, "Waiting for VPN service to report running...")
+                var started = false
+                repeat(60) { // 60 * 250ms = 15s max
+                    if (SimpleVpnService.isVpnRunning()) {
+                        started = true
+                        return@repeat
+                    }
+                    delay(250)
+                }
+
                 // Check if service is running
                 Log.d(TAG, "Checking if VPN service is running...")
-                if (SimpleVpnService.isVpnRunning()) {
+                if (started && SimpleVpnService.isVpnRunning()) {
                     Log.d(TAG, "VPN service is running, setting state to CONNECTED")
                     _connectionState.value = ConnectionState.CONNECTED
                     startStatsUpdates()
                     Log.d(TAG, "Connected to: ${server.name}")
                 } else {
-                    Log.e(TAG, "VPN service is not running")
+                    Log.e(TAG, "VPN service failed to start within timeout")
                     _connectionState.value = ConnectionState.ERROR
                     _errorMessage.value = "Failed to start VPN service"
                 }
