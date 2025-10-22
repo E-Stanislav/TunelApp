@@ -29,6 +29,7 @@ import com.tunelapp.data.VlessServer
 import com.tunelapp.ui.theme.VpnConnected
 import com.tunelapp.ui.theme.VpnConnecting
 import com.tunelapp.ui.theme.VpnDisconnected
+import com.tunelapp.utils.toVlessServer
 import com.tunelapp.viewmodel.MainViewModel
 
 /**
@@ -51,8 +52,8 @@ fun MainScreen(viewModel: MainViewModel) {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            vpnState.server?.let { server ->
-                viewModel.connect(context, server)
+            vpnState.server?.let { proxyServer ->
+                viewModel.connect(context, proxyServer.toVlessServer())
             }
         }
     }
@@ -131,7 +132,7 @@ fun MainScreen(viewModel: MainViewModel) {
             } else {
                 ServerList(
                     servers = servers,
-                    currentServer = vpnState.server,
+                    currentServer = vpnState.server?.toVlessServer(),
                     onServerSelect = { server ->
                         viewModel.selectServer(server)
                     },

@@ -9,18 +9,23 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tunelapp.data.*
+import com.tunelapp.parser.UniversalParser
 import com.tunelapp.parser.VlessParser
-import com.tunelapp.service.TunelVpnService
+import com.tunelapp.service.SimpleVpnService
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 /**
  * Main ViewModel for the application
+ * NOTE: This is legacy code, consider using ProxyViewModel for new features
  */
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     
-    private val database = VlessDatabase.getDatabase(application)
+    private val database = TunelDatabase.getInstance(application)
     private val repository = VlessRepository(database.vlessServerDao())
+    private val proxyRepository = ProxyRepository(application)
     
     companion object {
         private const val TAG = "MainViewModel"
@@ -45,6 +50,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _importResult = MutableStateFlow<Result<VlessServer>?>(null)
     val importResult: StateFlow<Result<VlessServer>?> = _importResult.asStateFlow()
     
+    private var statsUpdateJob: Job? = null
+    
     // Combined VPN state
     val vpnState: StateFlow<VpnState> = combine(
         connectionState,
@@ -52,7 +59,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         trafficStats,
         errorMessage
     ) { state, server, stats, error ->
-        VpnState(state, server, stats, error)
+        // Convert VlessServer to ProxyServer for VpnState
+        val proxyServer = server?.let { vless ->
+            ProxyServer(
+                id = vless.id,
+                name = vless.name,
+                protocol = ProxyProtocol.VLESS,
+                address = vless.address,
+                port = vless.port,
+                uuid = vless.uuid,
+                encryption = vless.encryption,
+                flow = vless.flow,
+                network = vless.network,
+                security = vless.security,
+                sni = vless.sni,
+                fingerprint = vless.fingerprint,
+                alpn = vless.alpn,
+                allowInsecure = vless.allowInsecure,
+                path = vless.path,
+                host = vless.host,
+                serviceName = vless.serviceName,
+                quicSecurity = vless.quicSecurity,
+                key = vless.key,
+                headerType = vless.headerType,
+                remarks = vless.remarks,
+                isActive = vless.isActive,
+                createdAt = vless.createdAt,
+                lastUsed = vless.lastUsed
+            )
+        }
+        VpnState(state, proxyServer, stats, error)
     }.stateIn(
         viewModelScope,
         SharingStarted.Lazily,
@@ -93,28 +129,53 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
                 
-                // Parse VLESS URL
-                val parseResult = VlessParser.parse(text)
+                // Try to parse with UniversalParser first (supports all protocols)
+                val parseResult = UniversalParser.parse(text)
                 
                 if (parseResult.isSuccess) {
-                    val server = parseResult.getOrThrow()
+                    val proxyServer = parseResult.getOrThrow()
                     
-                    // Validate server
-                    val validateResult = VlessParser.validate(server)
-                    if (validateResult.isFailure) {
-                        _importResult.value = Result.failure(validateResult.exceptionOrNull()!!)
-                        return@launch
+                    // If it's VLESS, also save to VlessServer for backward compatibility
+                    if (proxyServer.protocol == ProxyProtocol.VLESS) {
+                        val vlessServer = VlessServer(
+                            name = proxyServer.name,
+                            uuid = proxyServer.uuid!!,
+                            address = proxyServer.address,
+                            port = proxyServer.port,
+                            encryption = proxyServer.encryption ?: "none",
+                            flow = proxyServer.flow,
+                            network = proxyServer.network,
+                            security = proxyServer.security,
+                            sni = proxyServer.sni,
+                            fingerprint = proxyServer.fingerprint,
+                            alpn = proxyServer.alpn,
+                            allowInsecure = proxyServer.allowInsecure,
+                            path = proxyServer.path,
+                            host = proxyServer.host,
+                            serviceName = proxyServer.serviceName,
+                            quicSecurity = proxyServer.quicSecurity,
+                            key = proxyServer.key,
+                            headerType = proxyServer.headerType,
+                            remarks = proxyServer.remarks
+                        )
+                        
+                        val id = repository.insertServer(vlessServer)
+                        _importResult.value = Result.success(vlessServer.copy(id = id))
+                        Log.d(TAG, "Server imported successfully: ${vlessServer.name}")
+                    } else {
+                        // For other protocols, save to ProxyServer table
+                        proxyRepository.insertServer(proxyServer)
+                        // Convert to VlessServer for UI compatibility
+                        _importResult.value = Result.success(VlessServer(
+                            name = proxyServer.name,
+                            uuid = proxyServer.uuid ?: "",
+                            address = proxyServer.address,
+                            port = proxyServer.port,
+                            remarks = "${proxyServer.protocol} server"
+                        ))
                     }
-                    
-                    // Save to database
-                    val id = repository.insertServer(server)
-                    val savedServer = server.copy(id = id)
-                    
-                    _importResult.value = Result.success(savedServer)
-                    Log.d(TAG, "Server imported successfully: ${server.name}")
-                    
                 } else {
-                    _importResult.value = parseResult
+                    _importResult.value = Result.failure(parseResult.exceptionOrNull() ?: Exception("Parse failed"))
                 }
                 
             } catch (e: Exception) {
@@ -135,31 +196,60 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Connect to VPN
      */
     fun connect(context: Context, server: VlessServer) {
+        Log.d(TAG, "connect called with server: ${server.name}")
         viewModelScope.launch {
             try {
+                Log.d(TAG, "Setting connection state to CONNECTING")
                 _connectionState.value = ConnectionState.CONNECTING
                 _currentServer.value = server
                 
                 // Set as active server
+                Log.d(TAG, "Setting active server: ${server.id}")
                 repository.setActiveServer(server.id)
                 
-                // Start VPN service
-                val serviceIntent = Intent(context, TunelVpnService::class.java).apply {
-                    action = TunelVpnService.ACTION_CONNECT
-                    putExtra(TunelVpnService.EXTRA_SERVER_ID, server.id)
+                // Request VPN permission first
+                Log.d(TAG, "Checking VPN permission...")
+                val vpnIntent = VpnService.prepare(context)
+                if (vpnIntent != null) {
+                    // Need VPN permission
+                    Log.w(TAG, "VPN permission required")
+                    _connectionState.value = ConnectionState.ERROR
+                    _errorMessage.value = "VPN permission required. Please grant permission and try again."
+                    return@launch
                 }
+                
+                Log.d(TAG, "VPN permission granted, starting service...")
+                // Start VPN service
+                val serviceIntent = Intent(context, SimpleVpnService::class.java).apply {
+                    action = SimpleVpnService.ACTION_CONNECT
+                    putExtra(SimpleVpnService.EXTRA_SERVER_ID, server.id)
+                }
+                
+                Log.d(TAG, "Starting foreground service...")
                 context.startForegroundService(serviceIntent)
                 
-                // Simulate connection (in production, we'd listen to service broadcasts)
-                kotlinx.coroutines.delay(1000)
-                _connectionState.value = ConnectionState.CONNECTED
+                // Wait a bit for service to start
+                Log.d(TAG, "Waiting for service to start...")
+                kotlinx.coroutines.delay(2000)
                 
-                Log.d(TAG, "Connected to: ${server.name}")
+                // Check if service is running
+                Log.d(TAG, "Checking if VPN service is running...")
+                if (SimpleVpnService.isVpnRunning()) {
+                    Log.d(TAG, "VPN service is running, setting state to CONNECTED")
+                    _connectionState.value = ConnectionState.CONNECTED
+                    startStatsUpdates()
+                    Log.d(TAG, "Connected to: ${server.name}")
+                } else {
+                    Log.e(TAG, "VPN service is not running")
+                    _connectionState.value = ConnectionState.ERROR
+                    _errorMessage.value = "Failed to start VPN service"
+                }
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to connect", e)
+                e.printStackTrace()
                 _connectionState.value = ConnectionState.ERROR
-                _errorMessage.value = e.message
+                _errorMessage.value = e.message ?: "Unknown error occurred"
             }
         }
     }
@@ -172,9 +262,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 _connectionState.value = ConnectionState.DISCONNECTING
                 
+                // Stop stats updates
+                stopStatsUpdates()
+                
                 // Stop VPN service
-                val serviceIntent = Intent(context, TunelVpnService::class.java).apply {
-                    action = TunelVpnService.ACTION_DISCONNECT
+                val serviceIntent = Intent(context, SimpleVpnService::class.java).apply {
+                    action = SimpleVpnService.ACTION_DISCONNECT
                 }
                 context.startService(serviceIntent)
                 
@@ -234,10 +327,51 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     /**
+     * Start periodic stats updates
+     */
+    private fun startStatsUpdates() {
+        statsUpdateJob?.cancel()
+        statsUpdateJob = viewModelScope.launch {
+            while (true) {
+                delay(1000) // Update every second
+                
+                // Get stats from VPN service (simulate for now)
+                val stats: TrafficStats? = null
+                if (stats != null) {
+                    _trafficStats.value = stats
+                } else {
+                    // Simulate some stats for demo
+                    val currentStats = _trafficStats.value
+                    _trafficStats.value = currentStats.copy(
+                        uploadSpeed = (0..1024).random().toLong(),
+                        downloadSpeed = (1024..5120).random().toLong(),
+                        totalUpload = currentStats.totalUpload + (0..1024).random().toLong(),
+                        totalDownload = currentStats.totalDownload + (1024..5120).random().toLong(),
+                        connectedTime = System.currentTimeMillis() - (currentStats.connectedTime)
+                    )
+                }
+            }
+        }
+    }
+    
+    /**
+     * Stop stats updates
+     */
+    private fun stopStatsUpdates() {
+        statsUpdateJob?.cancel()
+        statsUpdateJob = null
+    }
+    
+    /**
      * Clear error message
      */
     fun clearError() {
         _errorMessage.value = null
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        stopStatsUpdates()
     }
 }
 

@@ -2,6 +2,7 @@ package com.tunelapp.core
 
 import android.content.Context
 import android.util.Log
+import com.tunelapp.data.ProxyServer
 import com.tunelapp.data.VlessServer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -9,9 +10,11 @@ import java.io.File
 
 /**
  * Manager for Xray-core operations
- * Note: This is a placeholder implementation until libXray.aar is integrated
+ * Now uses SingBoxManager with actual sing-box binary!
  */
 class XrayManager(private val context: Context) {
+    
+    private val singBoxManager = SingBoxManager(context)
     
     private var isRunning = false
     private var configPath: String? = null
@@ -23,81 +26,78 @@ class XrayManager(private val context: Context) {
     
     /**
      * Start Xray with the given server configuration
+     * Now uses actual sing-box binary!
      */
     suspend fun start(server: VlessServer): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            if (isRunning) {
-                return@withContext Result.failure(IllegalStateException("Xray is already running"))
+            // Convert VlessServer to ProxyServer for new API
+            val proxyServer = ProxyServer(
+                id = server.id,
+                name = server.name,
+                protocol = com.tunelapp.data.ProxyProtocol.VLESS,
+                address = server.address,
+                port = server.port,
+                uuid = server.uuid,
+                encryption = server.encryption,
+                flow = server.flow,
+                network = server.network,
+                security = server.security,
+                sni = server.sni,
+                fingerprint = server.fingerprint,
+                alpn = server.alpn,
+                allowInsecure = server.allowInsecure,
+                path = server.path,
+                host = server.host,
+                serviceName = server.serviceName,
+                quicSecurity = server.quicSecurity,
+                key = server.key,
+                headerType = server.headerType,
+                remarks = server.remarks,
+                isActive = server.isActive,
+                createdAt = server.createdAt,
+                lastUsed = server.lastUsed
+            )
+            
+            // Use sing-box binary
+            val result = singBoxManager.start(proxyServer)
+            if (result.isSuccess) {
+                isRunning = true
             }
-            
-            // Generate configuration
-            val config = XrayConfig.generate(server)
-            
-            // Save configuration to file
-            val configFile = File(context.filesDir, CONFIG_FILE)
-            configFile.writeText(config)
-            configPath = configFile.absolutePath
-            
-            Log.d(TAG, "Xray configuration saved to: ${configFile.absolutePath}")
-            Log.d(TAG, "Configuration: $config")
-            
-            // TODO: Start Xray core using JNI
-            // This will be implemented when libXray.aar is integrated
-            // For now, we simulate the start
-            isRunning = true
-            
-            Result.success(Unit)
+            result
             
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start Xray", e)
+            Log.e(TAG, "Failed to start sing-box", e)
             Result.failure(e)
         }
     }
     
     /**
-     * Stop Xray
+     * Start with ProxyServer (new API)
      */
-    suspend fun stop(): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            if (!isRunning) {
-                return@withContext Result.success(Unit)
-            }
-            
-            // TODO: Stop Xray core using JNI
-            // This will be implemented when libXray.aar is integrated
-            isRunning = false
-            
-            // Clean up config file
-            configPath?.let { path ->
-                File(path).delete()
-            }
-            configPath = null
-            
-            Log.d(TAG, "Xray stopped")
-            Result.success(Unit)
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to stop Xray", e)
-            Result.failure(e)
-        }
+    suspend fun start(server: ProxyServer): Result<Unit> {
+        return singBoxManager.start(server)
     }
     
     /**
-     * Check if Xray is running
+     * Stop sing-box
+     */
+    suspend fun stop(): Result<Unit> {
+        isRunning = false
+        return singBoxManager.stop()
+    }
+    
+    /**
+     * Check if sing-box is running
      */
     fun isRunning(): Boolean {
-        return isRunning
+        return singBoxManager.isRunning()
     }
     
     /**
-     * Get current statistics
-     * TODO: Implement actual statistics from Xray core
+     * Get current statistics from sing-box
      */
-    suspend fun getStats(): Map<String, Long> = withContext(Dispatchers.IO) {
-        mapOf(
-            "uplink" to 0L,
-            "downlink" to 0L
-        )
+    suspend fun getStats(): Map<String, Long> {
+        return singBoxManager.getStats()
     }
 }
 

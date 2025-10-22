@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tunelapp.data.ConnectionState
 import com.tunelapp.data.VlessServer
+import com.tunelapp.utils.toVlessServer
 import com.tunelapp.ui.theme.VpnConnected
 import com.tunelapp.ui.theme.VpnConnecting
 import com.tunelapp.ui.theme.VpnDisconnected
@@ -52,8 +53,8 @@ fun TvMainScreen(viewModel: MainViewModel) {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            vpnState.server?.let { server ->
-                viewModel.connect(context, server)
+            vpnState.server?.let { proxyServer ->
+                viewModel.connect(context, proxyServer.toVlessServer())
             }
         }
     }
@@ -119,7 +120,7 @@ fun TvMainScreen(viewModel: MainViewModel) {
                 } else {
                     TvServerList(
                         servers = servers,
-                        currentServer = vpnState.server,
+                        currentServer = vpnState.server?.toVlessServer(),
                         onServerSelect = { server ->
                             viewModel.selectServer(server)
                         },

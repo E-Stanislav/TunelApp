@@ -50,37 +50,8 @@ data class VlessServer(
     val lastUsed: Long? = null
 )
 
-/**
- * Connection state
- */
-enum class ConnectionState {
-    DISCONNECTED,
-    CONNECTING,
-    CONNECTED,
-    DISCONNECTING,
-    ERROR
-}
-
-/**
- * Traffic statistics
- */
-data class TrafficStats(
-    val uploadSpeed: Long = 0,      // bytes per second
-    val downloadSpeed: Long = 0,    // bytes per second
-    val totalUpload: Long = 0,      // total bytes
-    val totalDownload: Long = 0,    // total bytes
-    val connectedTime: Long = 0     // milliseconds
-)
-
-/**
- * VPN state with server and stats
- */
-data class VpnState(
-    val connectionState: ConnectionState = ConnectionState.DISCONNECTED,
-    val server: VlessServer? = null,
-    val stats: TrafficStats = TrafficStats(),
-    val errorMessage: String? = null
-)
+// Note: ConnectionState, TrafficStats, and VpnState are now defined in ProxyServer.kt
+// This file only contains VlessServer entity for legacy compatibility
 
 
 

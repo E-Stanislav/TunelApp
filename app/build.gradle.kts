@@ -23,15 +23,17 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
+            isMinifyEnabled = false  // Temporarily disable minification for debugging
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("boolean", "DEBUG_MODE", "true")  // Enable debug logging
         }
         debug {
             isMinifyEnabled = false
+            buildConfigField("boolean", "DEBUG_MODE", "true")
         }
     }
 
@@ -106,8 +108,17 @@ dependencies {
     // JSON parsing
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
     implementation("com.google.code.gson:gson:2.10.1")
+    
+    // QR Code Scanner
+    implementation("com.google.mlkit:barcode-scanning:17.2.0")
+    implementation("androidx.camera:camera-camera2:1.3.1")
+    implementation("androidx.camera:camera-lifecycle:1.3.1")
+    implementation("androidx.camera:camera-view:1.3.1")
 
-    // Xray-core (будет добавлен позже как AAR файл)
+    // sing-box / Xray-core
+    // Uncomment after running ./download_singbox.sh
+    // implementation(files("libs/libsingbox.aar"))
+    // OR for Xray:
     // implementation(files("libs/libxray.aar"))
 
     // Testing

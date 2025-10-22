@@ -10,15 +10,12 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.tunelapp.R
+import com.tunelapp.core.PacketForwarder
+import com.tunelapp.core.TrafficMonitor
 import com.tunelapp.core.XrayManager
 import com.tunelapp.data.VlessServer
-import com.tunelapp.data.VlessDatabase
+import com.tunelapp.data.TunelDatabase
 import kotlinx.coroutines.*
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.net.InetSocketAddress
-import java.nio.ByteBuffer
-import java.nio.channels.DatagramChannel
 
 /**
  * VPN Service for TunelApp
@@ -28,6 +25,8 @@ class TunelVpnService : VpnService() {
     
     private var vpnInterface: ParcelFileDescriptor? = null
     private var xrayManager: XrayManager? = null
+    private var packetForwarder: PacketForwarder? = null
+    private val trafficMonitor = TrafficMonitor()
     private var serviceJob: Job? = null
     private var isRunning = false
     
@@ -41,11 +40,29 @@ class TunelVpnService : VpnService() {
         const val ACTION_CONNECT = "com.tunelapp.action.CONNECT"
         const val ACTION_DISCONNECT = "com.tunelapp.action.DISCONNECT"
         const val EXTRA_SERVER_ID = "server_id"
+        
+        @Volatile
+        private var currentInstance: TunelVpnService? = null
+        
+        /**
+         * Get current traffic stats from running VPN service
+         */
+        fun getTrafficStats(): com.tunelapp.data.TrafficStats? {
+            return currentInstance?.trafficMonitor?.getCurrentStats()
+        }
+        
+        /**
+         * Check if VPN is running
+         */
+        fun isVpnRunning(): Boolean {
+            return currentInstance?.isRunning == true
+        }
     }
     
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "Service created")
+        currentInstance = this
         xrayManager = XrayManager(this)
         createNotificationChannel()
     }
@@ -74,7 +91,7 @@ class TunelVpnService : VpnService() {
         serviceJob = CoroutineScope(Dispatchers.IO).launch {
             try {
                 // Get server from database
-                val database = VlessDatabase.getDatabase(applicationContext)
+                val database = TunelDatabase.getInstance(applicationContext)
                 val server = database.vlessServerDao().getServerById(serverId)
                 
                 if (server == null) {
@@ -85,24 +102,22 @@ class TunelVpnService : VpnService() {
                 
                 Log.d(TAG, "Connecting to: ${server.name}")
                 
-                // Request VPN permission if needed
-                val intent = prepare(this@TunelVpnService)
-                if (intent != null) {
-                    Log.e(TAG, "VPN permission not granted")
+                // VPN permission should be checked before starting service
+                Log.d(TAG, "Starting VPN connection for server: $serverId")
+                
+                // Start sing-box core
+                val result = xrayManager?.start(server)
+                if (result?.isFailure == true) {
+                    Log.e(TAG, "Failed to start sing-box", result.exceptionOrNull())
                     stopSelf()
                     return@launch
                 }
                 
-                // Start Xray core
-                val result = xrayManager?.start(server)
-                if (result?.isFailure == true) {
-                    Log.e(TAG, "Failed to start Xray", result.exceptionOrNull())
-                    stopSelf()
-                    return@launch
-                }
+                Log.d(TAG, "sing-box started successfully")
                 
                 // Establish VPN connection
                 if (!establishVpn(server)) {
+                    Log.e(TAG, "Failed to establish VPN interface")
                     xrayManager?.stop()
                     stopSelf()
                     return@launch
@@ -142,8 +157,14 @@ class TunelVpnService : VpnService() {
             
             Log.d(TAG, "VPN interface established")
             
+            // Start traffic monitoring
+            trafficMonitor.start()
+            
             // Start packet forwarding
-            startPacketForwarding()
+            packetForwarder = PacketForwarder(vpnInterface!!, trafficMonitor = trafficMonitor)
+            packetForwarder?.start()
+            
+            Log.d(TAG, "Packet forwarding and traffic monitoring started")
             
             return true
             
@@ -153,35 +174,14 @@ class TunelVpnService : VpnService() {
         }
     }
     
-    private fun startPacketForwarding() {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val vpnInput = FileInputStream(vpnInterface?.fileDescriptor)
-                val vpnOutput = FileOutputStream(vpnInterface?.fileDescriptor)
-                val buffer = ByteBuffer.allocate(VPN_MTU)
-                
-                // Simple packet forwarding loop
-                // In production, this would route through Xray's SOCKS proxy
-                while (isRunning) {
-                    val length = vpnInput.channel.read(buffer)
-                    if (length > 0) {
-                        buffer.flip()
-                        
-                        // TODO: Forward packet to Xray SOCKS proxy (127.0.0.1:10808)
-                        // For now, we just log
-                        Log.v(TAG, "Received packet: $length bytes")
-                        
-                        buffer.clear()
-                    }
-                }
-                
-            } catch (e: Exception) {
-                if (isRunning) {
-                    Log.e(TAG, "Packet forwarding error", e)
-                }
-            }
-        }
-    }
+    /**
+     * Note: Packet forwarding is now handled by PacketForwarder class
+     * See core/PacketForwarder.kt
+     * 
+     * For production, consider using:
+     * - tun2socks library
+     * - OR sing-box's built-in TUN mode (configure in ProxyConfig)
+     */
     
     private fun disconnectVpn() {
         Log.d(TAG, "Disconnecting VPN")
@@ -189,7 +189,14 @@ class TunelVpnService : VpnService() {
         isRunning = false
         serviceJob?.cancel()
         
-        // Stop Xray
+        // Stop packet forwarding
+        packetForwarder?.stop()
+        packetForwarder = null
+        
+        // Stop traffic monitoring
+        trafficMonitor.stop()
+        
+        // Stop sing-box
         CoroutineScope(Dispatchers.IO).launch {
             xrayManager?.stop()
         }
@@ -211,6 +218,7 @@ class TunelVpnService : VpnService() {
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "Service destroyed")
+        currentInstance = null
         disconnectVpn()
     }
     

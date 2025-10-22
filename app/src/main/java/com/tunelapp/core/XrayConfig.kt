@@ -13,10 +13,10 @@ object XrayConfig {
      * Generate Xray configuration JSON
      */
     fun generate(server: VlessServer, socksPort: Int = 10808, httpPort: Int = 10809): String {
-        val config = XrayConfiguration(
-            log = LogConfig(loglevel = "warning"),
+        val config = LegacyXrayConfiguration(
+            log = LegacyLogConfig(loglevel = "warning"),
             inbounds = listOf(
-                Inbound(
+                LegacyInbound(
                     tag = "socks-in",
                     port = socksPort,
                     listen = "127.0.0.1",
@@ -27,7 +27,7 @@ object XrayConfig {
                         ip = "127.0.0.1"
                     )
                 ),
-                Inbound(
+                LegacyInbound(
                     tag = "http-in",
                     port = httpPort,
                     listen = "127.0.0.1",
@@ -35,7 +35,7 @@ object XrayConfig {
                 )
             ),
             outbounds = listOf(
-                Outbound(
+                LegacyOutbound(
                     tag = "proxy",
                     protocol = "vless",
                     settings = OutboundSettings(
@@ -56,12 +56,12 @@ object XrayConfig {
                     streamSettings = createStreamSettings(server),
                     mux = MuxConfig(enabled = false)
                 ),
-                Outbound(
+                LegacyOutbound(
                     tag = "direct",
                     protocol = "freedom",
                     settings = OutboundSettings()
                 ),
-                Outbound(
+                LegacyOutbound(
                     tag = "block",
                     protocol = "blackhole",
                     settings = OutboundSettings()
@@ -143,19 +143,21 @@ object XrayConfig {
     }
 }
 
-// Xray configuration data classes
-data class XrayConfiguration(
-    val log: LogConfig,
-    val inbounds: List<Inbound>,
-    val outbounds: List<Outbound>,
+// Legacy Xray configuration data classes (for VlessServer backward compatibility)
+// Note: ProxyConfig.kt has newer definitions for ProxyServer
+
+private data class LegacyXrayConfiguration(
+    val log: LegacyLogConfig,
+    val inbounds: List<LegacyInbound>,
+    val outbounds: List<LegacyOutbound>,
     val routing: RoutingConfig
 )
 
-data class LogConfig(
+private data class LegacyLogConfig(
     val loglevel: String
 )
 
-data class Inbound(
+private data class LegacyInbound(
     val tag: String,
     val port: Int,
     val listen: String,
@@ -169,7 +171,7 @@ data class InboundSettings(
     val ip: String? = null
 )
 
-data class Outbound(
+private data class LegacyOutbound(
     val tag: String,
     val protocol: String,
     val settings: OutboundSettings,

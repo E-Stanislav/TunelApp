@@ -41,8 +41,124 @@
     <string name="about">О приложении</string>
     <string name="version">Версия %s</string>
     
+    <!-- Servers -->
+    <string name="add_server">Добавить сервер</string>
+    <string name="edit_server">Редактировать сервер</string>
+    <string name="delete_server">Удалить сервер</string>
+    <string name="delete_confirm">Вы уверены что хотите удалить этот сервер?</string>
+    <string name="test_server">Тест сервера</string>
+    <string name="test_latency">Тест задержки</string>
+    <string name="test_speed">Тест скорости</string>
+    <string name="testing">Тестирование…</string>
+    <string name="latency_ms">%d мс</string>
+    <string name="speed_mbps">%.2f МБ/с</string>
+    <string name="server_unreachable">Сервер недоступен</string>
+    <string name="favorite">В избранное</string>
+    <string name="unfavorite">Из избранного</string>
+    <string name="protocol">Протокол</string>
+    <string name="server_count">%d серверов</string>
+    <string name="invalid_proxy_url">Неверный формат proxy URL</string>
+    <string name="scan_qr_code">Сканировать QR-код</string>
+    
+    <!-- Subscriptions -->
+    <string name="subscriptions">Подписки</string>
+    <string name="add_subscription">Добавить подписку</string>
+    <string name="edit_subscription">Редактировать подписку</string>
+    <string name="delete_subscription">Удалить подписку</string>
+    <string name="subscription_url">URL подписки</string>
+    <string name="subscription_name">Имя подписки</string>
+    <string name="update_subscription">Обновить подписку</string>
+    <string name="auto_update">Автообновление</string>
+    <string name="update_interval">Интервал обновления</string>
+    <string name="last_updated">Обновлено: %s</string>
+    <string name="never_updated">Никогда не обновлялось</string>
+    <string name="updating">Обновление…</string>
+    <string name="update_success">Успешно обновлено</string>
+    <string name="update_error">Ошибка обновления: %s</string>
+    
+    <!-- VPN -->
+    <string name="vpn_error">Ошибка VPN: %s</string>
+    <string name="vpn_service_stopped">VPN остановлен</string>
+    <string name="total_upload">Отправлено: %s</string>
+    <string name="total_download">Получено: %s</string>
+    <string name="connected_time">Подключено: %s</string>
+    
+    <!-- Routing -->
+    <string name="routing">Маршрутизация</string>
+    <string name="routing_mode">Режим маршрутизации</string>
+    <string name="proxy_all">Всё через VPN</string>
+    <string name="bypass_local">Обход локальных</string>
+    <string name="bypass_china">Обход Китай</string>
+    <string name="bypass_russia">Обход Россия</string>
+    <string name="split_tunneling">Раздельная маршрутизация</string>
+    <string name="custom_rules">Пользовательские правила</string>
+    <string name="add_rule">Добавить правило</string>
+    <string name="domain_rules">Правила доменов</string>
+    <string name="ip_rules">IP правила</string>
+    <string name="app_rules">Правила приложений</string>
+    
+    <!-- Settings -->
+    <string name="general">Основные</string>
+    <string name="connection">Подключение</string>
+    <string name="advanced">Дополнительно</string>
+    <string name="language">Язык</string>
+    <string name="theme">Тема</string>
+    <string name="light_theme">Светлая</string>
+    <string name="dark_theme">Темная</string>
+    <string name="system_theme">Системная</string>
+    <string name="dns">DNS</string>
+    <string name="mtu">MTU</string>
+    <string name="ipv6">IPv6</string>
+    <string name="logs">Логи</string>
+    <string name="export_logs">Экспорт логов</string>
+    <string name="clear_logs">Очистить логи</string>
+    <string name="backup">Резервная копия</string>
+    <string name="restore">Восстановить</string>
+    <string name="export_config">Экспорт конфигурации</string>
+    <string name="import_config">Импорт конфигурации</string>
+    
+    <!-- QR Scanner -->
+    <string name="qr_scanner_title">Сканирование QR-кода</string>
+    <string name="qr_scanner_hint">Наведите камеру на QR-код</string>
+    <string name="qr_scan_success">QR-код отсканирован</string>
+    <string name="qr_scan_error">Ошибка сканирования QR-кода</string>
+    <string name="camera_permission_required">Требуется разрешение камеры</string>
+    <string name="camera_permission_denied">Разрешение камеры отклонено</string>
+    
+    <!-- Protocols -->
+    <string name="protocol_vless">VLESS</string>
+    <string name="protocol_vmess">VMess</string>
+    <string name="protocol_shadowsocks">Shadowsocks</string>
+    <string name="protocol_trojan">Trojan</string>
+    <string name="protocol_socks">SOCKS5</string>
+    <string name="protocol_http">HTTP</string>
+    <string name="protocol_https">HTTPS</string>
+    
+    <!-- Time -->
+    <string name="seconds">%d секунд</string>
+    <string name="minutes">%d минут</string>
+    <string name="hours">%d часов</string>
+    <string name="days">%d дней</string>
+    
     <!-- Common -->
     <string name="ok">OK</string>
+    <string name="cancel">Отмена</string>
+    <string name="save">Сохранить</string>
+    <string name="delete">Удалить</string>
+    <string name="edit">Редактировать</string>
+    <string name="add">Добавить</string>
     <string name="warning">Подсказка</string>
+    <string name="error">Ошибка</string>
+    <string name="success">Успех</string>
+    <string name="yes">Да</string>
+    <string name="no">Нет</string>
+    <string name="close">Закрыть</string>
+    <string name="retry">Повторить</string>
+    <string name="loading">Загрузка…</string>
+    <string name="empty">Пусто</string>
+    <string name="search">Поиск</string>
+    <string name="filter">Фильтр</string>
+    <string name="sort">Сортировка</string>
+    <string name="refresh">Обновить</string>
 </resources>
 

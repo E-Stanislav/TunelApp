@@ -2,7 +2,8 @@ package com.tunelapp.parser
 
 import android.net.Uri
 import android.util.Base64
-import com.tunelapp.data.VlessServer
+import com.tunelapp.data.ProxyProtocol
+import com.tunelapp.data.ProxyServer
 import java.net.URLDecoder
 
 /**
@@ -14,7 +15,7 @@ object VlessParser {
     /**
      * Parse VLESS URL string
      */
-    fun parse(url: String): Result<VlessServer> {
+    fun parse(url: String): Result<ProxyServer> {
         return try {
             if (!url.startsWith("vless://")) {
                 return Result.failure(IllegalArgumentException("URL must start with vless://"))
@@ -71,9 +72,10 @@ object VlessParser {
                 }
             }
             
-            // Build VlessServer object
-            val server = VlessServer(
+            // Build ProxyServer object
+            val server = ProxyServer(
                 name = name,
+                protocol = ProxyProtocol.VLESS,
                 uuid = uuid,
                 address = address,
                 port = port,
@@ -91,6 +93,9 @@ object VlessParser {
                 quicSecurity = params["quicSecurity"],
                 key = params["key"],
                 headerType = params["headerType"],
+                publicKey = params["pbk"],
+                shortId = params["sid"],
+                spiderX = params["spx"],
                 remarks = name
             )
             
@@ -102,13 +107,15 @@ object VlessParser {
     }
     
     /**
-     * Convert VlessServer back to URL string
+     * Convert ProxyServer back to URL string
      */
-    fun toUrl(server: VlessServer): String {
+    fun toUrl(server: ProxyServer): String {
+        require(server.protocol == ProxyProtocol.VLESS) { "Server must be VLESS" }
+        require(server.uuid != null) { "UUID is required" }
         val params = mutableListOf<String>()
         
-        if (server.encryption != "none") {
-            params.add("encryption=${server.encryption}")
+        server.encryption?.let {
+            if (it != "none") params.add("encryption=$it")
         }
         server.flow?.let { params.add("flow=$it") }
         if (server.network != "tcp") {
@@ -129,6 +136,9 @@ object VlessParser {
         server.quicSecurity?.let { params.add("quicSecurity=$it") }
         server.key?.let { params.add("key=$it") }
         server.headerType?.let { params.add("headerType=$it") }
+        server.publicKey?.let { params.add("pbk=$it") }
+        server.shortId?.let { params.add("sid=$it") }
+        server.spiderX?.let { params.add("spx=$it") }
         
         val query = if (params.isNotEmpty()) "?${params.joinToString("&")}" else ""
         val name = Uri.encode(server.name)
@@ -139,9 +149,10 @@ object VlessParser {
     /**
      * Validate VLESS server configuration
      */
-    fun validate(server: VlessServer): Result<Unit> {
+    fun validate(server: ProxyServer): Result<Unit> {
         return try {
-            require(server.uuid.isNotEmpty()) { "UUID is required" }
+            require(server.protocol == ProxyProtocol.VLESS) { "Protocol must be VLESS" }
+            require(server.uuid != null && server.uuid.isNotEmpty()) { "UUID is required" }
             require(server.address.isNotEmpty()) { "Address is required" }
             require(server.port in 1..65535) { "Port must be between 1 and 65535" }
             require(server.name.isNotEmpty()) { "Name is required" }
