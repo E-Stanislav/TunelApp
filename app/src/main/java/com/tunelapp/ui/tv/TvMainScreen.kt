@@ -63,6 +63,7 @@ fun TvMainScreen(viewModel: MainViewModel) {
         if (vpnState.connectionState == ConnectionState.CONNECTING) {
             val intent = VpnService.prepare(context)
             if (intent != null) {
+                // For TV, we should show a message about VPN permission
                 vpnPermissionLauncher.launch(intent)
             }
         }

@@ -62,6 +62,9 @@ fun MainScreen(viewModel: MainViewModel) {
         if (vpnState.connectionState == ConnectionState.CONNECTING) {
             val intent = VpnService.prepare(context)
             if (intent != null) {
+                // Show permission dialog first
+                errorMessage = context.getString(R.string.vpn_permission_message)
+                showErrorDialog = true
                 vpnPermissionLauncher.launch(intent)
             }
         }

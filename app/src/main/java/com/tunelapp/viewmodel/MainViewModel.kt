@@ -137,14 +137,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun connect(context: Context, server: VlessServer) {
         viewModelScope.launch {
             try {
-                // Check VPN permission
-                val intent = VpnService.prepare(context)
-                if (intent != null) {
-                    _errorMessage.value = "VPN permission required"
-                    // The UI should handle starting the permission activity
-                    return@launch
-                }
-                
                 _connectionState.value = ConnectionState.CONNECTING
                 _currentServer.value = server
                 
