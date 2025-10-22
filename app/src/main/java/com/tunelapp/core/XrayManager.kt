@@ -28,7 +28,7 @@ class XrayManager(private val context: Context) {
      * Start Xray with the given server configuration
      * Now uses actual sing-box binary!
      */
-    suspend fun start(server: VlessServer): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun start(server: VlessServer, tunFileDescriptor: Int? = null): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             // Convert VlessServer to ProxyServer for new API
             val proxyServer = ProxyServer(
@@ -59,7 +59,7 @@ class XrayManager(private val context: Context) {
             )
             
             // Use sing-box binary
-            val result = singBoxManager.start(proxyServer)
+            val result = singBoxManager.start(proxyServer, tunFileDescriptor)
             if (result.isSuccess) {
                 isRunning = true
             }
@@ -74,8 +74,8 @@ class XrayManager(private val context: Context) {
     /**
      * Start with ProxyServer (new API)
      */
-    suspend fun start(server: ProxyServer): Result<Unit> {
-        return singBoxManager.start(server)
+    suspend fun start(server: ProxyServer, tunFileDescriptor: Int? = null): Result<Unit> {
+        return singBoxManager.start(server, tunFileDescriptor)
     }
     
     /**

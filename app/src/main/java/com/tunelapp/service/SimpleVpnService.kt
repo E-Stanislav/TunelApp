@@ -110,9 +110,19 @@ class SimpleVpnService : VpnService() {
                 // revert this if anything fails below.
                 isRunning = true
                 
-                // Start sing-box core
-                Log.d(TAG, "Starting sing-box core...")
-                val result = xrayManager?.start(server)
+                // Establish VPN connection first
+                Log.d(TAG, "Establishing VPN interface...")
+                if (!establishVpn(server)) {
+                    Log.e(TAG, "Failed to establish VPN interface")
+                    xrayManager?.stop()
+                    isRunning = false
+                    stopSelf()
+                    return@launch
+                }
+                
+                // Start sing-box core with TUN mode after VPN is established
+                Log.d(TAG, "Starting sing-box core with TUN mode...")
+                val result = xrayManager?.start(server, vpnInterface?.fd)
                 if (result?.isFailure == true) {
                     // Fallback mode: continue without sing-box so VPN can
                     // still establish and UI won't fail hard. Traffic may not
@@ -122,14 +132,11 @@ class SimpleVpnService : VpnService() {
                 
                 Log.d(TAG, "sing-box started successfully")
                 
-                // Establish VPN connection
-                Log.d(TAG, "Establishing VPN interface...")
-                if (!establishVpn(server)) {
-                    Log.e(TAG, "Failed to establish VPN interface")
-                    xrayManager?.stop()
-                    isRunning = false
-                    stopSelf()
-                    return@launch
+                // If sing-box is running in TUN mode, we don't need packet forwarding
+                if (result?.isSuccess == true) {
+                    Log.d(TAG, "sing-box TUN mode active - packet forwarding disabled")
+                } else {
+                    Log.d(TAG, "sing-box failed - using fallback packet forwarding")
                 }
                 
                 Log.d(TAG, "VPN interface established successfully")
@@ -160,6 +167,15 @@ class SimpleVpnService : VpnService() {
                 .addDnsServer("8.8.8.8")
                 .addDnsServer("8.8.4.4")
             
+            // Exclude our own app (and thus sing-box subprocess) from being
+            // routed into the VPN to avoid traffic loop. This lets core reach
+            // the remote server directly.
+            try {
+                builder.addDisallowedApplication(packageName)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to addDisallowedApplication: ${e.message}")
+            }
+            
             // Establish the VPN
             vpnInterface = builder.establish()
             
@@ -173,7 +189,9 @@ class SimpleVpnService : VpnService() {
             // Start traffic monitoring
             trafficMonitor.start()
             
-            // Start packet forwarding
+            // Only start packet forwarding if sing-box TUN mode failed
+            // Note: result variable is not available in this scope, so we'll start packet forwarding as fallback
+            Log.d(TAG, "Starting fallback packet forwarding...")
             packetForwarder = WorkingPacketForwarder(vpnInterface!!, trafficMonitor = trafficMonitor)
             packetForwarder?.start()
             

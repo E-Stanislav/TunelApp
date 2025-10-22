@@ -11,6 +11,32 @@ import com.tunelapp.data.ProxyServer
 object ProxyConfig {
     
     /**
+     * Generate TUN configuration for sing-box
+     */
+    fun generateTunConfig(server: ProxyServer, tunFd: Int): String {
+        val config = mapOf(
+            "log" to mapOf("level" to "info"),
+            "inbounds" to listOf(
+                mapOf(
+                    "type" to "tun",
+                    "tag" to "tun-in",
+                    "interface_name" to "tun0",
+                    "inet4_address" to "10.0.0.1/30",
+                    "mtu" to 1500,
+                    "auto_route" to true,
+                    "strict_route" to true,
+                    "endpoint_independent_nat" to true,
+                    "stack" to "system"
+                )
+            ),
+            "outbounds" to createOutbounds(server),
+            "route" to createRouting()
+        )
+        
+        return Gson().toJson(config)
+    }
+    
+    /**
      * Generate Xray configuration JSON for any protocol
      */
     fun generateXrayConfig(server: ProxyServer, socksPort: Int = 10808, httpPort: Int = 10809): String {

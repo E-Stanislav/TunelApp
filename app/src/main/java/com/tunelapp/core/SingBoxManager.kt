@@ -8,6 +8,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
+// Fixed version
+
 /**
  * Manager for sing-box binary (executable)
  * This is a working implementation that uses the sing-box binary directly
@@ -16,6 +18,7 @@ class SingBoxManager(private val context: Context) {
     
     private var process: Process? = null
     private var isRunning = false
+    private var tunFileDescriptor: Int? = null
     
     companion object {
         private const val TAG = "SingBoxManager"
@@ -25,24 +28,35 @@ class SingBoxManager(private val context: Context) {
     
     /**
      * Start sing-box with the given server configuration
+     * @param server Proxy server configuration
+     * @param tunFileDescriptor TUN interface file descriptor (if provided, sing-box will use TUN mode)
      */
-    suspend fun start(server: ProxyServer): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun start(server: ProxyServer, tunFileDescriptor: Int? = null): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             if (isRunning) {
                 return@withContext Result.failure(IllegalStateException("sing-box is already running"))
             }
             
+            this.tunFileDescriptor = tunFileDescriptor
+            
             // Copy binary from assets to internal storage (if not exists)
             val binaryFile = prepareBinary()
             
             // Generate configuration
-            val config = ProxyConfig.generateXrayConfig(server)
+            val config = if (tunFileDescriptor != null) {
+                // TUN mode: sing-box handles TUN directly
+                ProxyConfig.generateTunConfig(server, tunFileDescriptor)
+            } else {
+                // SOCKS mode: legacy configuration
+                ProxyConfig.generateXrayConfig(server)
+            }
             
             // Save configuration to file
             val configFile = File(context.filesDir, CONFIG_FILE)
             configFile.writeText(config)
             
             Log.d(TAG, "Configuration saved to: ${configFile.absolutePath}")
+            Log.d(TAG, "Using TUN mode: ${tunFileDescriptor != null}")
             
             // Start sing-box process
             val command = arrayOf(
@@ -51,7 +65,17 @@ class SingBoxManager(private val context: Context) {
                 "-c", configFile.absolutePath
             )
             
-            process = Runtime.getRuntime().exec(command)
+            // Pass TUN file descriptor to sing-box if in TUN mode
+            val processBuilder = ProcessBuilder(*command)
+            if (tunFileDescriptor != null) {
+                processBuilder.environment()["TUN_FD"] = tunFileDescriptor.toString()
+                // Pass TUN file descriptor to child process
+                processBuilder.redirectInput(ProcessBuilder.Redirect.PIPE)
+                processBuilder.redirectOutput(ProcessBuilder.Redirect.PIPE)
+                processBuilder.redirectError(ProcessBuilder.Redirect.PIPE)
+            }
+            
+            process = processBuilder.start()
             isRunning = true
             
             // Monitor process output in background
@@ -210,4 +234,3 @@ class SingBoxManager(private val context: Context) {
         }.start()
     }
 }
-

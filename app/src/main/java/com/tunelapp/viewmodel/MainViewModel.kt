@@ -344,20 +344,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             while (true) {
                 delay(1000) // Update every second
                 
-                // Get stats from VPN service (simulate for now)
-                val stats: TrafficStats? = null
+                // Read real stats from running VPN service
+                val stats: TrafficStats? = SimpleVpnService.getTrafficStats()
                 if (stats != null) {
                     _trafficStats.value = stats
-                } else {
-                    // Simulate some stats for demo
-                    val currentStats = _trafficStats.value
-                    _trafficStats.value = currentStats.copy(
-                        uploadSpeed = (0..1024).random().toLong(),
-                        downloadSpeed = (1024..5120).random().toLong(),
-                        totalUpload = currentStats.totalUpload + (0..1024).random().toLong(),
-                        totalDownload = currentStats.totalDownload + (1024..5120).random().toLong(),
-                        connectedTime = System.currentTimeMillis() - (currentStats.connectedTime)
-                    )
                 }
             }
         }
