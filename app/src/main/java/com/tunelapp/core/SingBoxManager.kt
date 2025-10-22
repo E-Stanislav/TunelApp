@@ -31,21 +31,22 @@ class SingBoxManager(private val context: Context) {
      * @param server Proxy server configuration
      * @param tunFileDescriptor TUN interface file descriptor (if provided, sing-box will use TUN mode)
      */
-    suspend fun start(server: ProxyServer, tunFileDescriptor: Int? = null): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun start(server: ProxyServer, tunFd: Int? = null): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             if (isRunning) {
                 return@withContext Result.failure(IllegalStateException("sing-box is already running"))
             }
             
-            this.tunFileDescriptor = tunFileDescriptor
+            // Store TUN file descriptor for later use
+            tunFileDescriptor = tunFd
             
             // Copy binary from assets to internal storage (if not exists)
             val binaryFile = prepareBinary()
             
             // Generate configuration
-            val config = if (tunFileDescriptor != null) {
+            val config = if (tunFd != null) {
                 // TUN mode: sing-box handles TUN directly
-                ProxyConfig.generateTunConfig(server, tunFileDescriptor)
+                ProxyConfig.generateTunConfig(server, tunFd)
             } else {
                 // SOCKS mode: legacy configuration
                 ProxyConfig.generateXrayConfig(server)
@@ -56,7 +57,7 @@ class SingBoxManager(private val context: Context) {
             configFile.writeText(config)
             
             Log.d(TAG, "Configuration saved to: ${configFile.absolutePath}")
-            Log.d(TAG, "Using TUN mode: ${tunFileDescriptor != null}")
+            Log.d(TAG, "Using TUN mode: ${tunFd != null}")
             
             // Start sing-box process
             val command = arrayOf(
@@ -67,8 +68,8 @@ class SingBoxManager(private val context: Context) {
             
             // Pass TUN file descriptor to sing-box if in TUN mode
             val processBuilder = ProcessBuilder(*command)
-            if (tunFileDescriptor != null) {
-                processBuilder.environment()["TUN_FD"] = tunFileDescriptor.toString()
+            if (tunFd != null) {
+                processBuilder.environment()["TUN_FD"] = tunFd.toString()
                 // Pass TUN file descriptor to child process
                 processBuilder.redirectInput(ProcessBuilder.Redirect.PIPE)
                 processBuilder.redirectOutput(ProcessBuilder.Redirect.PIPE)
